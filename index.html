@@ -144,9 +144,9 @@
 
         .status-badge {
             display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
             font-weight: bold;
             margin-top: 10px;
         }
@@ -157,7 +157,7 @@
 <body>
 
     <div class="container">
-        <!-- Панель управления и ввода -->
+        <!-- Панель параметров -->
         <div class="panel">
             <h1>MechAI-Core</h1>
             <div class="subtitle">Параметрический расчет и анализ зубчатой передачи</div>
@@ -186,15 +186,15 @@
                 <button type="submit" class="btn">Выполнить расчет и анализ</button>
             </form>
             
-            <div style="margin-top: 20px;">
-                <span id="statusBadge" class="status-badge status-optimal">Система готова к расчету</span>
+            <div style="margin-top: 15px;">
+                <div id="statusBadge" class="status-badge status-optimal">Система готова к расчету</div>
             </div>
         </div>
 
-        <!-- Панель визуализации и результатов -->
+        <!-- Панель результатов и визуализации -->
         <div class="panel">
             <h1>Результаты и Визуализация</h1>
-            <div class="subtitle">Геометрия, напряжения и AI-прогнозирование</div>
+            <div class="subtitle">Геометрия, напряжения и Physics AI суррогатная модель</div>
 
             <canvas id="gearCanvas"></canvas>
 
@@ -228,7 +228,6 @@
     </div>
 
     <script>
-        // Определяем адрес бэкенда (автоматически определяет локальный или облачный Render)
         const API_URL = window.location.hostname === "localhost" 
             ? "http://127.0.0.1:8000/api/analyze-gear" 
             : "https://mechai-core.onrender.com/api/analyze-gear";
@@ -236,18 +235,17 @@
         const canvas = document.getElementById('gearCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Функция отрисовки схематичной шестерни на Canvas
         function drawGear(teeth, module) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             const cx = canvas.width / 2;
             const cy = canvas.height / 2;
-            const radius = (module * teeth) / 2 * 2.5; // масштабируем для экрана
+            const radius = (module * teeth) / 2 * 2.2;
 
             ctx.save();
             ctx.translate(cx, cy);
             
-            // Внешняя окружность / зубья (упрощенная стилизация)
+            // Тело шестерни
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
             ctx.fillStyle = '#1f242c';
@@ -256,7 +254,7 @@
             ctx.strokeStyle = '#58a6ff';
             ctx.stroke();
 
-            // Делительная окружность (штриховая)
+            // Делительная окружность
             ctx.beginPath();
             ctx.arc(0, 0, radius * 0.85, 0, Math.PI * 2);
             ctx.setLineDash([4, 4]);
@@ -264,16 +262,16 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Зубья (символично по количеству)
+            // Зубья шестерни
             for (let i = 0; i < teeth; i++) {
                 const angle = (i * 2 * Math.PI) / teeth;
                 ctx.rotate(angle);
                 ctx.fillStyle = '#58a6ff';
-                ctx.fillRect(radius - 6, -4, 12, 8);
+                ctx.fillRect(radius - 5, -4, 10, 8);
                 ctx.rotate(-angle);
             }
 
-            // Центральное отверстие вала
+            // Отверстие вала
             ctx.beginPath();
             ctx.arc(0, 0, radius * 0.3, 0, Math.PI * 2);
             ctx.fillStyle = '#0d1117';
@@ -285,7 +283,6 @@
             ctx.restore();
         }
 
-        // Подгоняем размер canvas под реальное разрешение
         function resizeCanvas() {
             canvas.width = canvas.parentElement.clientWidth - 48;
             canvas.height = 260;
@@ -295,10 +292,9 @@
         window.addEventListener('resize', resizeCanvas);
         window.addEventListener('load', () => {
             resizeCanvas();
-            sendRequest(); // автоматический расчет при старте
+            sendRequest();
         });
 
-        // Обработка формы
         document.getElementById('gearForm').addEventListener('submit', function(e) {
             e.preventDefault();
             sendRequest();
@@ -312,7 +308,6 @@
                 torque: parseFloat(document.getElementById('torque').value)
             };
 
-            // Обновляем чертеж при отправке
             drawGear(data.teeth, data.module);
 
             try {
@@ -326,7 +321,6 @@
 
                 const result = await response.json();
 
-                // Вывод результатов в карточки
                 document.getElementById('resPitch').innerText = result.geometry.pitch_diameter_mm + " мм";
                 document.getElementById('resOuter').innerText = result.geometry.outer_diameter_mm + " мм";
                 document.getElementById('resBending').innerText = result.mechanics.bending_stress_mpa + " МПа";
@@ -334,18 +328,17 @@
                 document.getElementById('resEfficiency').innerText = result.ai_prediction.estimated_efficiency_percent + " %";
                 document.getElementById('resTemp').innerText = result.ai_prediction.predicted_max_temperature_c + " °C";
 
-                // Статус бейдж
                 const badge = document.getElementById('statusBadge');
                 if (result.mechanics.is_safe) {
                     badge.className = "status-badge status-optimal";
                     badge.innerText = "Статус: Конструкция надежна (Optimal)";
                 } else {
                     badge.className = "status-badge status-warning";
-                    badge.innerText = "Внимание: Превышение нагрузок!";
+                    badge.innerText = "Внимание: Превышение напряжений!";
                 }
 
             } catch (error) {
-                alert('Не удалось выполнить запрос к серверу: ' + error.message);
+                alert('Не удалось выполнить запрос: ' + error.message);
             }
         }
     </script>

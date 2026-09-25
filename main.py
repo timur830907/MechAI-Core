@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fpdf import FPDF
+import io
 
 app = FastAPI(
     title="MechAI-Core API",
@@ -9,7 +11,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Настройка CORS, чтобы фронтенд и бэкенд свободно общались
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,43 +19,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Модель входящих параметров шестерни
 class GearInput(BaseModel):
     module: float
     teeth: int
     face_width: float
     torque: float
 
-# Главная страница: возвращает наш красивый HTML-интерфейс
 @app.get("/", response_class=FileResponse)
 def read_root():
     return "index.html"
 
-# Эндпоинт инженерного анализа
 @app.post("/api/analyze-gear")
 def analyze_gear(data: GearInput):
-    # 1. Расчет базовой геометрии
     pitch_diameter = data.module * data.teeth
     outer_diameter = pitch_diameter + 2 * data.module
     root_diameter = pitch_diameter - 2.5 * data.module
     
-    # 2. Упрощенный расчет механических напряжений (изгиб зубьев по Льюису)
-    # Формула изгибного напряжения: sigma = (Force * FormFactor) / (Module * FaceWidth)
     tangential_force = (data.torque * 2000) / pitch_diameter if pitch_diameter > 0 else 0
-    form_factor = 2.1 # Условный коэффициент формы зуба для z=24
+    form_factor = 2.1
     bending_stress = (tangential_force * form_factor) / (data.module * data.face_width) if (data.module * data.face_width) > 0 else 0
     
-    # Предел прочности материала (например, сталь 40Х с закалкой: ~450 МПа)
     allowable_stress = 450.0 
     safety_factor = round(allowable_stress / bending_stress, 2) if bending_stress > 0 else 99.0
     is_safe = bending_stress <= allowable_stress
 
-    # 3. Physics AI суррогатное моделирование (интеллектуальная оценка)
-    # Оценка КПД на основе модуля и момента
     estimated_efficiency = round(96.5 - (data.torque / 500.0) + (data.module * 0.2), 1)
     estimated_efficiency = max(80.0, min(99.0, estimated_efficiency))
 
-    # Прогнозирование максимальной рабочей температуры (°C)
     predicted_max_temp = round(25.0 + (tangential_force * 0.08) / (data.face_width * 0.1), 1)
 
     return {
@@ -82,3 +73,76 @@ def analyze_gear(data: GearInput):
             "recommendation": "Конструкция оптимальна для длительной работы." if is_safe else "Рекомендуется увеличить модуль или ширину венца."
         }
     }
+
+@app.post("/api/export-pdf")
+def export_pdf(data: GearInput):
+    # Расчеты для отчета
+    pitch_diameter = data.module * data.teeth
+    outer_diameter = pitch_diameter + 2 * data.module
+    root_diameter = pitch_diameter - 2.5 * data.module
+    tangential_force = (data.torque * 2000) / pitch_diameter if pitch_diameter > 0 else 0
+    bending_stress = (tangential_force * 2.1) / (data.module * data.face_width) if (data.module * data.face_width) > 0 else 0
+    safety_factor = round(450.0 / bending_stress, 2) if bending_stress > 0 else 99.0
+    is_safe = bending_stress <= 450.0
+    efficiency = round(max(80.0, min(99.0, 96.5 - (data.torque / 500.0) + (data.module * 0.2))), 1)
+    temp = round(25.0 + (tangential_force * 0.08) / (data.face_width * 0.1), 1)
+
+    # Генерация PDF документа
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # Заголовок
+    pdf.set_font("helvetica", "B", 18)
+    pdf.set_text_color(30, 40, 50)
+    pdf.cell(0, 10, "MechAI-Core: Engineering Report", new_x="LMARGIN", new_y="NEXT", align="C")
+    
+    pdf.set_font("helvetica", "", 10)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 6, "Autonomous Engineering Platform: Gear Geometry & Physics AI Analysis", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.ln(10)
+
+    # Секция 1: Исходные параметры
+    pdf.set_font("helvetica", "B", 12)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 8, "1. Input Parameters", new_x="LMARGIN", new_y="NEXT")
+    
+    pdf.set_font("helvetica", "", 10)
+    pdf.cell(90, 6, f"Module (m): {data.module} mm")
+    pdf.cell(90, 6, f"Number of Teeth (z): {data.teeth}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(90, 6, f"Face Width (b): {data.face_width} mm")
+    pdf.cell(90, 6, f"Torque (T): {data.torque} N*m", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+
+    # Секция 2: Геометрия
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 8, "2. Gear Geometry", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", "", 10)
+    pdf.cell(90, 6, f"Pitch Diameter: {round(pitch_diameter, 2)} mm")
+    pdf.cell(90, 6, f"Outer Diameter: {round(outer_diameter, 2)} mm", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(90, 6, f"Root Diameter: {round(root_diameter, 2)} mm", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+
+    # Секция 3: Механика и ИИ
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 8, "3. Mechanics & Physics AI Evaluation", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", "", 10)
+    pdf.cell(90, 6, f"Bending Stress: {round(bending_stress, 2)} MPa")
+    pdf.cell(90, 6, f"Safety Factor: {safety_factor}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(90, 6, f"Estimated Efficiency (AI): {efficiency} %")
+    pdf.cell(90, 6, f"Predicted Max Temperature: {temp} C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+
+    # Статус
+    status_text = "STATUS: OPTIMAL (Safe for operation)" if is_safe else "STATUS: WARNING (High stress levels!)"
+    pdf.set_font("helvetica", "B", 11)
+    pdf.set_text_color(35, 134, 54) if is_safe else pdf.set_text_color(210, 153, 34)
+    pdf.cell(0, 10, status_text, new_x="LMARGIN", new_y="NEXT")
+
+    # Вывод в память для скачивания
+    pdf_output = io.BytesIO(pdf.output())
+    return Response(
+        content=pdf_output.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=mechai_gear_report.pdf"}
+    )

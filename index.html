@@ -106,6 +106,16 @@
             background-color: #2ea043;
         }
 
+        .btn-secondary {
+            background-color: #21262d;
+            border: 1px solid var(--border-color);
+            margin-top: 8px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #30363d;
+        }
+
         .results-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -157,7 +167,7 @@
 <body>
 
     <div class="container">
-        <!-- Панель параметров -->
+        <!-- Панель ввода -->
         <div class="panel">
             <h1>MechAI-Core</h1>
             <div class="subtitle">Параметрический расчет и анализ зубчатой передачи</div>
@@ -184,6 +194,7 @@
                 </div>
 
                 <button type="submit" class="btn">Выполнить расчет и анализ</button>
+                <button type="button" class="btn btn-secondary" onclick="exportPDF()">📄 Скачать отчет в PDF</button>
             </form>
             
             <div style="margin-top: 15px;">
@@ -191,7 +202,7 @@
             </div>
         </div>
 
-        <!-- Панель результатов и визуализации -->
+        <!-- Панель визуализации -->
         <div class="panel">
             <h1>Результаты и Визуализация</h1>
             <div class="subtitle">Геометрия, напряжения и Physics AI суррогатная модель</div>
@@ -245,7 +256,6 @@
             ctx.save();
             ctx.translate(cx, cy);
             
-            // Тело шестерни
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
             ctx.fillStyle = '#1f242c';
@@ -254,7 +264,6 @@
             ctx.strokeStyle = '#58a6ff';
             ctx.stroke();
 
-            // Делительная окружность
             ctx.beginPath();
             ctx.arc(0, 0, radius * 0.85, 0, Math.PI * 2);
             ctx.setLineDash([4, 4]);
@@ -262,7 +271,6 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Зубья шестерни
             for (let i = 0; i < teeth; i++) {
                 const angle = (i * 2 * Math.PI) / teeth;
                 ctx.rotate(angle);
@@ -271,7 +279,6 @@
                 ctx.rotate(-angle);
             }
 
-            // Отверстие вала
             ctx.beginPath();
             ctx.arc(0, 0, radius * 0.3, 0, Math.PI * 2);
             ctx.fillStyle = '#0d1117';
@@ -339,6 +346,38 @@
 
             } catch (error) {
                 alert('Не удалось выполнить запрос: ' + error.message);
+            }
+        }
+
+        async function exportPDF() {
+            const data = {
+                module: parseFloat(document.getElementById('module').value),
+                teeth: parseInt(document.getElementById('teeth').value),
+                face_width: parseFloat(document.getElementById('face_width').value),
+                torque: parseFloat(document.getElementById('torque').value)
+            };
+
+            const pdfApiUrl = API_URL.replace('/api/analyze-gear', '/api/export-pdf');
+
+            try {
+                const response = await fetch(pdfApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) throw new Error('Ошибка генерации PDF');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "mechai_gear_report.pdf";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } catch (error) {
+                alert('Не удалось скачать PDF: ' + error.message);
             }
         }
     </script>

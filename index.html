@@ -72,7 +72,7 @@
             color: var(--text-main);
         }
 
-        input {
+        input, select {
             width: 100%;
             padding: 10px 12px;
             background-color: #0d1117;
@@ -83,7 +83,7 @@
             box-sizing: border-box;
         }
 
-        input:focus {
+        input:focus, select:focus {
             outline: none;
             border-color: var(--accent-color);
         }
@@ -174,6 +174,17 @@
 
             <form id="gearForm">
                 <div class="form-group">
+                    <label for="material">Материал шестерни:</label>
+                    <select id="material">
+                        <option value="steel_40x">Сталь 40Х (улучшенная)</option>
+                        <option value="steel_45">Сталь 45 (нормализованная)</option>
+                        <option value="steel_20">Сталь 20 (цементуемая)</option>
+                        <option value="cast_iron">Чугун СЧ20</option>
+                        <option value="bronze">Бронза БрОЦС</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label for="module">Модуль зацепления (m, мм):</label>
                     <input type="number" id="module" value="3.0" step="0.5" min="0.5" required>
                 </div>
@@ -205,7 +216,7 @@
         <!-- Панель визуализации -->
         <div class="panel">
             <h1>Результаты и Визуализация</h1>
-            <div class="subtitle">Геометрия, напряжения и Physics AI суррогатная модель</div>
+            <div class="subtitle">Анимация зацепления пары шестерен и Physics AI</div>
 
             <canvas id="gearCanvas"></canvas>
 
@@ -246,59 +257,74 @@
         const canvas = document.getElementById('gearCanvas');
         const ctx = canvas.getContext('2d');
 
-        function drawGear(teeth, module) {
+        let rotationAngle = 0;
+
+        function drawGearMesh(teeth1, module) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
-            const radius = (module * teeth) / 2 * 2.2;
+            const r1 = (module * teeth1) / 2;
+            const teeth2 = 18; // ведомая шестерня
+            const r2 = (module * teeth2) / 2;
 
+            const cx1 = canvas.width / 2 - r2 * 0.6;
+            const cy1 = canvas.height / 2;
+            const cx2 = cx1 + r1 + r2;
+            const cy2 = cy1;
+
+            // Отрисовка ведущей шестерни
             ctx.save();
-            ctx.translate(cx, cy);
-            
+            ctx.translate(cx1, cy1);
+            ctx.rotate(rotationAngle);
+            drawSingleGear(teeth1, r1, '#58a6ff');
+            ctx.restore();
+
+            // Отрисовка ведомой шестерни (вращается в противоположную сторону)
+            ctx.save();
+            ctx.translate(cx2, cy2);
+            const ratio = teeth1 / teeth2;
+            ctx.rotate(-rotationAngle * ratio + Math.PI / teeth2);
+            drawSingleGear(teeth2, r2, '#d29922');
+            ctx.restore();
+
+            rotationAngle += 0.02;
+            requestAnimationFrame(() => drawGearMesh(parseInt(document.getElementById('teeth').value), parseFloat(document.getElementById('module').value)));
+        }
+
+        function drawSingleGear(teeth, radius, color) {
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
             ctx.fillStyle = '#1f242c';
             ctx.fill();
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = '#58a6ff';
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = color;
             ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(0, 0, radius * 0.85, 0, Math.PI * 2);
-            ctx.setLineDash([4, 4]);
-            ctx.strokeStyle = '#8b949e';
-            ctx.stroke();
-            ctx.setLineDash([]);
 
             for (let i = 0; i < teeth; i++) {
                 const angle = (i * 2 * Math.PI) / teeth;
                 ctx.rotate(angle);
-                ctx.fillStyle = '#58a6ff';
-                ctx.fillRect(radius - 5, -4, 10, 8);
+                ctx.fillStyle = color;
+                ctx.fillRect(radius - 4, -3, 8, 6);
                 ctx.rotate(-angle);
             }
 
             ctx.beginPath();
-            ctx.arc(0, 0, radius * 0.3, 0, Math.PI * 2);
+            ctx.arc(0, 0, radius * 0.35, 0, Math.PI * 2);
             ctx.fillStyle = '#0d1117';
             ctx.fill();
             ctx.strokeStyle = '#30363d';
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 3;
             ctx.stroke();
-
-            ctx.restore();
         }
 
         function resizeCanvas() {
             canvas.width = canvas.parentElement.clientWidth - 48;
             canvas.height = 260;
-            drawGear(parseInt(document.getElementById('teeth').value), parseFloat(document.getElementById('module').value));
         }
 
         window.addEventListener('resize', resizeCanvas);
         window.addEventListener('load', () => {
             resizeCanvas();
+            drawGearMesh(parseInt(document.getElementById('teeth').value), parseFloat(document.getElementById('module').value));
             sendRequest();
         });
 
@@ -309,13 +335,12 @@
 
         async function sendRequest() {
             const data = {
+                material: document.getElementById('material').value,
                 module: parseFloat(document.getElementById('module').value),
                 teeth: parseInt(document.getElementById('teeth').value),
                 face_width: parseFloat(document.getElementById('face_width').value),
                 torque: parseFloat(document.getElementById('torque').value)
             };
-
-            drawGear(data.teeth, data.module);
 
             try {
                 const response = await fetch(API_URL, {
@@ -351,6 +376,7 @@
 
         async function exportPDF() {
             const data = {
+                material: document.getElementById('material').value,
                 module: parseFloat(document.getElementById('module').value),
                 teeth: parseInt(document.getElementById('teeth').value),
                 face_width: parseFloat(document.getElementById('face_width').value),

@@ -2,403 +2,178 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MechAI-Core | Инженерная платформа расчета и ИИ</title>
+    <title>MechAI-Core — CAE & Physics AI Суфлер</title>
     <style>
-        :root {
-            --bg-color: #0d1117;
-            --card-bg: #161b22;
-            --border-color: #30363d;
-            --accent-color: #58a6ff;
-            --success-color: #238636;
-            --text-main: #c9d1d9;
-            --text-muted: #8b949e;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        @media (max-width: 900px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .panel {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-        }
-
-        h1 {
-            color: var(--accent-color);
-            font-size: 1.5rem;
-            margin-top: 0;
-            margin-bottom: 8px;
-        }
-
-        .subtitle {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-bottom: 24px;
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        label {
-            display: block;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 6px;
-            color: var(--text-main);
-        }
-
-        input, select {
-            width: 100%;
-            padding: 10px 12px;
-            background-color: #0d1117;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: white;
-            font-size: 1rem;
-            box-sizing: border-box;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--accent-color);
-        }
-
-        .btn {
-            background-color: var(--success-color);
-            color: white;
-            border: none;
-            width: 100%;
-            padding: 12px;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-            margin-top: 10px;
-        }
-
-        .btn:hover {
-            background-color: #2ea043;
-        }
-
-        .btn-secondary {
-            background-color: #21262d;
-            border: 1px solid var(--border-color);
-            margin-top: 8px;
-        }
-
-        .btn-secondary:hover {
-            background-color: #30363d;
-        }
-
-        .results-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 16px;
-        }
-
-        .metric-card {
-            background-color: #0d1117;
-            border: 1px solid var(--border-color);
-            padding: 12px;
-            border-radius: 8px;
-        }
-
-        .metric-title {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-
-        .metric-value {
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: var(--accent-color);
-        }
-
-        canvas {
-            width: 100%;
-            height: 280px;
-            background-color: #0d1117;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            margin-top: 16px;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        .status-optimal { background-color: rgba(35, 134, 54, 0.2); color: #3fb950; border: 1px solid #238636; }
-        .status-warning { background-color: rgba(210, 153, 34, 0.2); color: #d29922; border: 1px solid #9e6a03; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0b0f19; color: #f3f4f6; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 440px; background: #111827; border-right: 1px solid #1f2937; padding: 24px; overflow-y: auto; }
+        .main-content { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+        h1 { font-size: 22px; color: #60a5fa; margin-bottom: 4px; }
+        .subtitle { font-size: 13px; color: #9ca3af; margin-bottom: 20px; }
+        .form-group { margin-bottom: 14px; }
+        label { display: block; font-size: 12px; color: #d1d5db; margin-bottom: 6px; }
+        input, select { width: 100%; padding: 10px 12px; background: #1f2937; border: 1px solid #374151; border-radius: 6px; color: white; font-size: 14px; }
+        input:focus, select:focus { outline: none; border-color: #3b82f6; }
+        button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
+        button:hover { background: #1d4ed8; }
+        .btn-secondary { background: #374151; margin-top: 8px; }
+        .btn-secondary:hover { background: #4b5563; }
+        .status-badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; margin-top: 14px; }
+        .status-optimal { background: #064e3b; color: #34d399; }
+        .status-warning { background: #7f1d1d; color: #f87171; }
+        
+        .visual-panel { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; align-items: center; position: relative; }
+        canvas { background: #080c14; border-radius: 8px; border: 1px solid #1f2937; }
+        
+        .grid-results { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+        .card { background: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 16px; }
+        .card-title { font-size: 11px; color: #9ca3af; text-transform: uppercase; margin-bottom: 6px; }
+        .card-value { font-size: 20px; font-weight: 700; color: #60a5fa; }
+        .legend { display: flex; gap: 15px; margin-top: 10px; font-size: 11px; color: #9ca3af; align-items: center; }
+        .legend-box { width: 12px; height: 12px; border-radius: 3px; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <!-- Панель ввода -->
-        <div class="panel">
-            <h1>MechAI-Core</h1>
-            <div class="subtitle">Параметрический расчет и анализ зубчатой передачи</div>
-
-            <form id="gearForm">
-                <div class="form-group">
-                    <label for="material">Материал шестерни:</label>
-                    <select id="material">
-                        <option value="steel_40x">Сталь 40Х (улучшенная)</option>
-                        <option value="steel_45">Сталь 45 (нормализованная)</option>
-                        <option value="steel_20">Сталь 20 (цементуемая)</option>
-                        <option value="cast_iron">Чугун СЧ20</option>
-                        <option value="bronze">Бронза БрОЦС</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="module">Модуль зацепления (m, мм):</label>
-                    <input type="number" id="module" value="3.0" step="0.5" min="0.5" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="teeth">Количество зубьев (z):</label>
-                    <input type="number" id="teeth" value="24" step="1" min="6" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="face_width">Ширина венца (b, мм):</label>
-                    <input type="number" id="face_width" value="35.0" step="1" min="5" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="torque">Крутящий момент (T, Н·м):</label>
-                    <input type="number" id="torque" value="150.0" step="10" min="1" required>
-                </div>
-
-                <button type="submit" class="btn">Выполнить расчет и анализ</button>
-                <button type="button" class="btn btn-secondary" onclick="exportPDF()">📄 Скачать отчет в PDF</button>
-            </form>
-            
-            <div style="margin-top: 15px;">
-                <div id="statusBadge" class="status-badge status-optimal">Система готова к расчету</div>
-            </div>
+    <div class="sidebar">
+        <h1>MechAI-Core</h1>
+        <div class="subtitle">CAE-расчет и тепловая карта напряжений</div>
+        
+        <div class="form-group">
+            <label>Материал шестерни:</label>
+            <select id="material">
+                <option value="steel_40x">Сталь 40Х (улучшенная)</option>
+                <option value="steel_45">Сталь 45 (нормализация)</option>
+                <option value="bronze_br_o10f1">Бронза БрО10Ф1</option>
+                <option value="delrin_pom">Полиацеталь (POM-C)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Модуль зацепления (m, мм):</label>
+            <input type="number" id="module" value="3.0" step="0.5">
+        </div>
+        <div class="form-group">
+            <label>Количество зубьев (z):</label>
+            <input type="number" id="teeth" value="24" step="1">
+        </div>
+        <div class="form-group">
+            <label>Ширина венца (b, мм):</label>
+            <input type="number" id="width" value="35.0" step="1">
+        </div>
+        <div class="form-group">
+            <label>Крутящий момент (T, Н*м):</label>
+            <input type="number" id="torque" value="150.0" step="5">
         </div>
 
-        <!-- Панель визуализации -->
-        <div class="panel">
-            <h1>Результаты и Визуализация</h1>
-            <div class="subtitle">Анимация зацепления пары шестерен и Physics AI</div>
+        <button onclick="calculate()">Выполнить расчет и CAE-анализ</button>
+        <button class="btn-secondary" onclick="exportPDF()">Скачать отчет в PDF</button>
+        
+        <div id="statusBadge" class="status-badge status-optimal">Статус: Готов к расчету</div>
+    </div>
 
-            <canvas id="gearCanvas"></canvas>
+    <div class="main-content">
+        <div class="visual-panel">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 14px; font-weight: 600; color: #d1d5db;">Тепловая карта напряжений и анимация зацепления</span>
+                <div class="legend">
+                    <div style="display:flex; align-items:center; gap:4px;"><div class="legend-box" style="background:#3b82f6;"></div> Норма</div>
+                    <div style="display:flex; align-items:center; gap:4px;"><div class="legend-box" style="background:#ef4444;"></div> Нагрузка / Пик</div>
+                </div>
+            </div>
+            <canvas id="gearCanvas" width="600" height="260"></canvas>
+        </div>
 
-            <div class="results-grid">
-                <div class="metric-card">
-                    <div class="metric-title">Делит. диаметр</div>
-                    <div class="metric-value" id="resPitch">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-title">Диаметр вершин</div>
-                    <div class="metric-value" id="resOuter">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-title">Изгибное напряжение</div>
-                    <div class="metric-value" id="resBending">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-title">Коэффициент запаса</div>
-                    <div class="metric-value" id="resSafety">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-title">КПД (Physics AI)</div>
-                    <div class="metric-value" id="resEfficiency">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-title">Прогноз t° макс</div>
-                    <div class="metric-value" id="resTemp">-</div>
-                </div>
+        <div class="grid-results">
+            <div class="card">
+                <div class="card-title">Делит. диаметр</div>
+                <div class="card-value" id="res_d">-</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Диаметр вершин</div>
+                <div class="card-value" id="res_da">-</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Изгибное напряжение</div>
+                <div class="card-value" id="res_stress">-</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Коэффициент запаса</div>
+                <div class="card-value" id="res_safety">-</div>
+            </div>
+            <div class="card">
+                <div class="card-title">КПД (Physics AI)</div>
+                <div class="card-value" id="res_eff">-</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Прогноз T макс</div>
+                <div class="card-value" id="res_temp">-</div>
             </div>
         </div>
     </div>
 
     <script>
-        const API_URL = window.location.hostname === "localhost" 
-            ? "http://127.0.0.1:8000/api/analyze-gear" 
-            : "https://mechai-core.onrender.com/api/analyze-gear";
+        let angle1 = 0;
+        let currentStressRatio = 0.5;
 
-        const canvas = document.getElementById('gearCanvas');
-        const ctx = canvas.getContext('2d');
-
-        let rotationAngle = 0;
-
-        function drawGearMesh(teeth1, module) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            const r1 = (module * teeth1) / 2;
-            const teeth2 = 18; // ведомая шестерня
-            const r2 = (module * teeth2) / 2;
-
-            const cx1 = canvas.width / 2 - r2 * 0.6;
-            const cy1 = canvas.height / 2;
-            const cx2 = cx1 + r1 + r2;
-            const cy2 = cy1;
-
-            // Отрисовка ведущей шестерни
-            ctx.save();
-            ctx.translate(cx1, cy1);
-            ctx.rotate(rotationAngle);
-            drawSingleGear(teeth1, r1, '#58a6ff');
-            ctx.restore();
-
-            // Отрисовка ведомой шестерни (вращается в противоположную сторону)
-            ctx.save();
-            ctx.translate(cx2, cy2);
-            const ratio = teeth1 / teeth2;
-            ctx.rotate(-rotationAngle * ratio + Math.PI / teeth2);
-            drawSingleGear(teeth2, r2, '#d29922');
-            ctx.restore();
-
-            rotationAngle += 0.02;
-            requestAnimationFrame(() => drawGearMesh(parseInt(document.getElementById('teeth').value), parseFloat(document.getElementById('module').value)));
-        }
-
-        function drawSingleGear(teeth, radius, color) {
-            ctx.beginPath();
-            ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#1f242c';
-            ctx.fill();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = color;
-            ctx.stroke();
-
-            for (let i = 0; i < teeth; i++) {
-                const angle = (i * 2 * Math.PI) / teeth;
-                ctx.rotate(angle);
-                ctx.fillStyle = color;
-                ctx.fillRect(radius - 4, -3, 8, 6);
-                ctx.rotate(-angle);
-            }
-
-            ctx.beginPath();
-            ctx.arc(0, 0, radius * 0.35, 0, Math.PI * 2);
-            ctx.fillStyle = '#0d1117';
-            ctx.fill();
-            ctx.strokeStyle = '#30363d';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-        }
-
-        function resizeCanvas() {
-            canvas.width = canvas.parentElement.clientWidth - 48;
-            canvas.height = 260;
-        }
-
-        window.addEventListener('resize', resizeCanvas);
-        window.addEventListener('load', () => {
-            resizeCanvas();
-            drawGearMesh(parseInt(document.getElementById('teeth').value), parseFloat(document.getElementById('module').value));
-            sendRequest();
-        });
-
-        document.getElementById('gearForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            sendRequest();
-        });
-
-        async function sendRequest() {
-            const data = {
+        async function calculate() {
+            const payload = {
                 material: document.getElementById('material').value,
                 module: parseFloat(document.getElementById('module').value),
                 teeth: parseInt(document.getElementById('teeth').value),
-                face_width: parseFloat(document.getElementById('face_width').value),
+                width: parseFloat(document.getElementById('width').value),
                 torque: parseFloat(document.getElementById('torque').value)
             };
 
             try {
-                const response = await fetch(API_URL, {
+                const response = await fetch('/api/calculate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(payload)
                 });
+                const data = await response.json();
 
-                if (!response.ok) throw new Error('Ошибка связи с сервером');
+                document.getElementById('res_d').innerText = data.pitch_diameter + ' мм';
+                document.getElementById('res_da').innerText = data.tip_diameter + ' мм';
+                document.getElementById('res_stress').innerText = data.bending_stress + ' МПа';
+                document.getElementById('res_safety').innerText = data.safety_factor;
+                document.getElementById('res_eff').innerText = data.efficiency + ' %';
+                document.getElementById('res_temp').innerText = data.max_temperature + ' °C';
 
-                const result = await response.json();
-
-                document.getElementById('resPitch').innerText = result.geometry.pitch_diameter_mm + " мм";
-                document.getElementById('resOuter').innerText = result.geometry.outer_diameter_mm + " мм";
-                document.getElementById('resBending').innerText = result.mechanics.bending_stress_mpa + " МПа";
-                document.getElementById('resSafety').innerText = result.mechanics.safety_factor;
-                document.getElementById('resEfficiency').innerText = result.ai_prediction.estimated_efficiency_percent + " %";
-                document.getElementById('resTemp').innerText = result.ai_prediction.predicted_max_temperature_c + " °C";
+                currentStressRatio = Math.min(1.0, data.bending_stress / data.allowable_bending_stress);
 
                 const badge = document.getElementById('statusBadge');
-                if (result.mechanics.is_safe) {
-                    badge.className = "status-badge status-optimal";
-                    badge.innerText = "Статус: Конструкция надежна (Optimal)";
+                if (data.status === 'Optimal') {
+                    badge.className = 'status-badge status-optimal';
+                    badge.innerText = 'Статус: Конструкция надежна (Optimal)';
                 } else {
-                    badge.className = "status-badge status-warning";
-                    badge.innerText = "Внимание: Превышение напряжений!";
+                    badge.className = 'status-badge status-warning';
+                    badge.innerText = 'Статус: Превышение напряжений (Warning)';
                 }
-
-            } catch (error) {
-                alert('Не удалось выполнить запрос: ' + error.message);
+            } catch (err) {
+                alert('Ошибка соединения с бэкендом: ' + err.message);
             }
         }
 
         async function exportPDF() {
-            const data = {
+            const payload = {
                 material: document.getElementById('material').value,
                 module: parseFloat(document.getElementById('module').value),
                 teeth: parseInt(document.getElementById('teeth').value),
-                face_width: parseFloat(document.getElementById('face_width').value),
+                width: parseFloat(document.getElementById('width').value),
                 torque: parseFloat(document.getElementById('torque').value)
             };
 
-            const pdfApiUrl = API_URL.replace('/api/analyze-gear', '/api/export-pdf');
-
             try {
-                const response = await fetch(pdfApiUrl, {
+                const response = await fetch('/api/export-pdf', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(payload)
                 });
-
-                if (!response.ok) throw new Error('Ошибка генерации PDF');
-
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = "mechai_gear_report.pdf";
+                a.download = 'mechai_gear_report.pdf';
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -406,6 +181,78 @@
                 alert('Не удалось скачать PDF: ' + error.message);
             }
         }
+
+        // Рендеринг анимации и тепловой карты на Canvas
+        const canvas = document.getElementById('gearCanvas');
+        const ctx = canvas.getContext('2d');
+        const teethCount = 24;
+
+        function drawGear(cx, cy, radius, angle, stressRatio) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+
+            // Обод шестерни с тепловой картой
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#1e293b';
+            ctx.fill();
+            ctx.lineWidth = 3;
+            
+            // Цвет контура зависит от уровня напряжения (Heatmap)
+            let strokeColor = '#3b82f6';
+            if (stressRatio > 0.8) strokeColor = '#ef4444';
+            else if (stressRatio > 0.5) strokeColor = '#f59e0b';
+            ctx.strokeStyle = strokeColor;
+            ctx.stroke();
+
+            // Зубья шестерни с CAE подсветкой корня
+            const outerR = radius + 8;
+            for (let i = 0; i < teethCount; i++) {
+                ctx.rotate((Math.PI * 2) / teethCount);
+                ctx.beginPath();
+                ctx.moveTo(-4, -radius);
+                ctx.lineTo(-6, -outerR);
+                ctx.lineTo(6, -outerR);
+                ctx.lineTo(4, -radius);
+                
+                // Градиент напряжения на зубе
+                ctx.fillStyle = stressRatio > 0.7 ? '#ef4444' : '#3b82f6';
+                ctx.fill();
+            }
+
+            // Центральное отверстие вала
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.35, 0, Math.PI * 2);
+            ctx.fillStyle = '#0b0f19';
+            ctx.fill();
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const z1 = 24;
+            const z2 = 24;
+            const r = 75;
+
+            // Взаимосвязанное вращение двух шестерен
+            angle1 += 0.015;
+            let angle2 = -angle1 * (z1 / z2) + Math.PI / z1;
+
+            drawGear(180, 130, r, angle1, currentStressRatio);
+            drawGear(180 + r * 2, 130, r, angle2, currentStressRatio);
+
+            requestAnimationFrame(animate);
+        }
+
+        // Автоматический расчет при загрузке
+        calculate();
+        animate();
     </script>
 </body>
 </html>

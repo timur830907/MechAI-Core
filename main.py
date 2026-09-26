@@ -1,15 +1,13 @@
-from fastapi import FastAPI, Response
-from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from fpdf import FPDF
 import io
+import math
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
-app = FastAPI(
-    title="MechAI-Core API",
-    description="Автономная инженерная платформа: расчет геометрии, механика и Physics AI суррогатное моделирование.",
-    version="1.1.0"
-)
+app = FastAPI(title="MechAI-Core API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,139 +17,155 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# База данных материалов (допускаемое напряжение на изгиб в МПа)
+# База данных материалов с допускаемыми напряжениями (МПа)
 MATERIALS_DB = {
-    "steel_40x": {"name": "Сталь 40Х (улучшенная)", "allowable_stress": 480.0},
-    "steel_45": {"name": "Сталь 45 (нормализованная)", "allowable_stress": 380.0},
-    "steel_20": {"name": "Сталь 20 (цементуемая)", "allowable_stress": 320.0},
-    "cast_iron": {"name": "Чугун СЧ20", "allowable_stress": 200.0},
-    "bronze": {"name": "Бронза БрОЦС", "allowable_stress": 180.0}
+    "steel_40x": {
+        "name": "Сталь 40Х (улучшенная)",
+        "sigma_bend_allow": 450.0,
+        "sigma_contact_allow": 850.0,
+        "density": 7850.0,
+    },
+    "steel_45": {
+        "name": "Сталь 45 (нормализация)",
+        "sigma_bend_allow": 300.0,
+        "sigma_contact_allow": 580.0,
+        "density": 7830.0,
+    },
+    "bronze_br_o10f1": {
+        "name": "Бронза БрО10Ф1",
+        "sigma_bend_allow": 160.0,
+        "sigma_contact_allow": 320.0,
+        "density": 8800.0,
+    },
+    "delrin_pom": {
+        "name": "Полиацеталь (POM-C / Делрин)",
+        "sigma_bend_allow": 65.0,
+        "sigma_contact_allow": 90.0,
+        "density": 1410.0,
+    },
 }
 
+
 class GearInput(BaseModel):
-    module: float
-    teeth: int
-    face_width: float
-    torque: float
-    material: str = "steel_40x"
+    material: str = Field("steel_40x", description="Ключ материала из базы")
+    module: float = Field(..., gt=0, description="Модуль зацепления, мм")
+    teeth: int = Field(..., gt=2, description="Количество зубьев")
+    width: float = Field(..., gt=0, description="Ширина венца, мм")
+    torque: float = Field(..., gt=0, description="Крутящий момент, Н*м")
 
-@app.get("/", response_class=FileResponse)
-def read_root():
-    return "index.html"
 
-@app.post("/api/analyze-gear")
-def analyze_gear(data: GearInput):
-    mat_info = MATERIALS_DB.get(data.material, MATERIALS_DB["steel_40x"])
-    allowable_stress = mat_info["allowable_stress"]
+@get_route_or_similar = app.post("/api/calculate")
+def calculate_gear(data: GearInput):
+    if data.material not in MATERIALS_DB:
+        raise HTTPException(status_code=400, detail="Неизвестный материал")
 
-    pitch_diameter = data.module * data.teeth
-    outer_diameter = pitch_diameter + 2 * data.module
-    root_diameter = pitch_diameter - 2.5 * data.module
-    
-    tangential_force = (data.torque * 2000) / pitch_diameter if pitch_diameter > 0 else 0
-    form_factor = 2.1
-    bending_stress = (tangential_force * form_factor) / (data.module * data.face_width) if (data.module * data.face_width) > 0 else 0
-    
-    safety_factor = round(allowable_stress / bending_stress, 2) if bending_stress > 0 else 99.0
-    is_safe = bending_stress <= allowable_stress
+    mat = MATERIALS_DB[data.material]
 
-    estimated_efficiency = round(96.5 - (data.torque / 500.0) + (data.module * 0.2), 1)
-    estimated_efficiency = max(80.0, min(99.0, estimated_efficiency))
+    # Геометрический расчет цилиндрической передачи
+    d = data.module * data.teeth  # Делетельный диаметр
+    d_a = d + 2 * data.module  # Диаметр вершин
+    d_f = d - 2.5 * data.module  # Диаметр впадин
 
-    predicted_max_temp = round(25.0 + (tangential_force * 0.08) / (data.face_width * 0.1), 1)
+    r = d / 2.0
+    # Окружное усилие (Н)
+    ft = (2.0 * data.torque * 1000.0) / d if r > 0 else 0.0
+
+    # Расчет изгибного напряжения по упрощенной модели Льюиса с учетом формы зуба
+    # sigma_bend = Ft / (b * m * y)
+    y_form = 0.154 - (0.912 / data.teeth)  # Коэффициент формы зуба
+    if y_form <= 0:
+        y_form = 0.1
+    sigma_bend = ft / (data.width * data.module * y_form)
+
+    # Запас прочности по изгибу
+    safety_factor = (
+        mat["sigma_bend_allow"] / sigma_bend if sigma_bend > 0 else 99.9
+    )
+
+    # Physics AI Суррогатная модель (предсказание КПД и температуры)
+    # Учитывает трение в зацеплении и тепловыделение при нагрузке
+    base_efficiency = 0.985
+    load_factor = data.torque / (data.module * data.teeth * data.width * 0.05)
+    efficiency = max(0.85, min(0.992, base_efficiency - 0.003 * load_factor))
+
+    # Максимальная расчетная температура (°C)
+    power_loss = (data.torque * 15.0) * (1.0 - efficiency)
+    max_temp = 25.0 + power_loss * 2.4
+
+    status = (
+        "Optimal"
+        if safety_factor >= 1.5 and sigma_bend <= mat["sigma_bend_allow"]
+        else "Overload / Warning"
+    )
+
+    # Генерация матрицы напряжений для тепловой карты зуба (heatmap по 5 контрольным точкам)
+    stress_profile = [
+        round(sigma_bend * 0.2, 2),
+        round(sigma_bend * 0.5, 2),
+        round(sigma_bend * 0.8, 2),
+        round(sigma_bend * 1.0, 2),  # Пик у корня
+        round(sigma_bend * 0.4, 2),
+    ]
 
     return {
-        "status": "success",
-        "input_parameters": {
-            "module": data.module,
-            "teeth": data.teeth,
-            "face_width": data.face_width,
-            "torque": data.torque,
-            "material_name": mat_info["name"]
-        },
-        "geometry": {
-            "pitch_diameter_mm": round(pitch_diameter, 2),
-            "outer_diameter_mm": round(outer_diameter, 2),
-            "root_diameter_mm": round(root_diameter, 2)
-        },
-        "mechanics": {
-            "tangential_force_n": round(tangential_force, 2),
-            "bending_stress_mpa": round(bending_stress, 2),
-            "safety_factor": safety_factor,
-            "is_safe": is_safe
-        },
-        "ai_prediction": {
-            "estimated_efficiency_percent": estimated_efficiency,
-            "predicted_max_temperature_c": predicted_max_temp,
-            "recommendation": "Конструкция оптимальна для длительной работы." if is_safe else "Рекомендуется увеличить модуль или ширину венца."
-        }
+        "material_name": mat["name"],
+        "pitch_diameter": round(d, 2),
+        "tip_diameter": round(d_a, 2),
+        "root_diameter": round(d_f, 2),
+        "bending_stress": round(sigma_bend, 2),
+        "allowable_bending_stress": mat["sigma_bend_allow"],
+        "safety_factor": round(safety_factor, 2),
+        "efficiency": round(efficiency * 100, 2),
+        "max_temperature": round(max_temp, 1),
+        "status": status,
+        "stress_profile": stress_profile,
     }
+
 
 @app.post("/api/export-pdf")
 def export_pdf(data: GearInput):
-    mat_info = MATERIALS_DB.get(data.material, MATERIALS_DB["steel_40x"])
-    allowable_stress = mat_info["allowable_stress"]
+    result = calculate_gear(data)
 
-    pitch_diameter = data.module * data.teeth
-    outer_diameter = pitch_diameter + 2 * data.module
-    root_diameter = pitch_diameter - 2.5 * data.module
-    tangential_force = (data.torque * 2000) / pitch_diameter if pitch_diameter > 0 else 0
-    bending_stress = (tangential_force * 2.1) / (data.module * data.face_width) if (data.module * data.face_width) > 0 else 0
-    safety_factor = round(allowable_stress / bending_stress, 2) if bending_stress > 0 else 99.0
-    is_safe = bending_stress <= allowable_stress
-    efficiency = round(max(80.0, min(99.0, 96.5 - (data.torque / 500.0) + (data.module * 0.2))), 1)
-    temp = round(25.0 + (tangential_force * 0.08) / (data.face_width * 0.1), 1)
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
 
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    
-    pdf.set_font("helvetica", "B", 18)
-    pdf.set_text_color(30, 40, 50)
-    pdf.cell(0, 10, "MechAI-Core: Engineering Report", new_x="LMARGIN", new_y="NEXT", align="C")
-    
-    pdf.set_font("helvetica", "", 10)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 6, "Autonomous Engineering Platform: Gear Geometry & Physics AI Analysis", new_x="LMARGIN", new_y="NEXT", align="C")
-    pdf.ln(10)
+    pdf.setFont("Helvetica-Bold", 18)
+    pdf.drawString(50, height - 50, "MechAI-Core: Инженерный отчет")
 
-    pdf.set_font("helvetica", "B", 12)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 8, "1. Input Parameters & Material", new_x="LMARGIN", new_y="NEXT")
-    
-    pdf.set_font("helvetica", "", 10)
-    pdf.cell(90, 6, f"Module (m): {data.module} mm")
-    pdf.cell(90, 6, f"Number of Teeth (z): {data.teeth}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(90, 6, f"Face Width (b): {data.face_width} mm")
-    pdf.cell(90, 6, f"Torque (T): {data.torque} N*m", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Material: {mat_info['name']} (sigma_all = {allowable_stress} MPa)", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
+    pdf.setFont("Helvetica", 11)
+    y = height - 90
+    lines = [
+        f"Материал: {result['material_name']}",
+        f"Модуль зацепления (m): {data.module} мм",
+        f"Количество зубьев (z): {data.teeth}",
+        f"Ширина венца (b): {data.width} мм",
+        f"Крутящий момент (T): {data.torque} Н*м",
+        "-" * 50,
+        f"Делетельный диаметр: {result['pitch_diameter']} мм",
+        f"Диаметр вершин: {result['tip_diameter']} мм",
+        f"Изгибное напряжение: {result['bending_stress']} МПа",
+        f"Допускаемое напряжение: {result['allowable_bending_stress']} МПа",
+        f"Коэффициент запаса: {result['safety_factor']}",
+        f"КПД (Physics AI): {result['efficiency']} %",
+        f"Прогноз T макс: {result['max_temperature']} °C",
+        f"Статус конструкции: {result['status']}",
+    ]
 
-    pdf.set_font("helvetica", "B", 12)
-    pdf.cell(0, 8, "2. Gear Geometry", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("helvetica", "", 10)
-    pdf.cell(90, 6, f"Pitch Diameter: {round(pitch_diameter, 2)} mm")
-    pdf.cell(90, 6, f"Outer Diameter: {round(outer_diameter, 2)} mm", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(90, 6, f"Root Diameter: {round(root_diameter, 2)} mm", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
+    for line in lines:
+        pdf.drawString(50, y, line)
+        y -= 22
 
-    pdf.set_font("helvetica", "B", 12)
-    pdf.cell(0, 8, "3. Mechanics & Physics AI Evaluation", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("helvetica", "", 10)
-    pdf.cell(90, 6, f"Bending Stress: {round(bending_stress, 2)} MPa")
-    pdf.cell(90, 6, f"Safety Factor: {safety_factor}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(90, 6, f"Estimated Efficiency (AI): {efficiency} %")
-    pdf.cell(90, 6, f"Predicted Max Temperature: {temp} C", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(8)
-
-    status_text = "STATUS: OPTIMAL (Safe for operation)" if is_safe else "STATUS: WARNING (High stress levels!)"
-    pdf.set_font("helvetica", "B", 11)
-    pdf.set_text_color(35, 134, 54) if is_safe else pdf.set_text_color(210, 153, 34)
-    pdf.cell(0, 10, status_text, new_x="LMARGIN", new_y="NEXT")
-
-    pdf_output = io.BytesIO(pdf.output())
-    return Response(
-        content=pdf_output.getvalue(),
+    pdf.save()
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=mechai_gear_report.pdf"}
+        headers={"Content-Disposition": "attachment; filename=mechai_report.pdf"},
     )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
